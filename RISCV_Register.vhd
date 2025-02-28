@@ -77,34 +77,42 @@ begin
 
 	if rising_edge(clk) then
 		
-	if nRst = '0' then
-		for i in 0 to 31 loop
-		mem(i) <= x"00000000"; --setting values of registers all to 0.
-		end loop;
-	else
-		
-		if we3 = '1' then
-		
-		RegisterWrite(wd3, a3, mem);
-		
-		else --replace with endif if not caring about reading and writing at the same time.
-			if a1 = "00000" then
-			rd1 <= (others => '0');
-			else
-			RegisterRead(a1, mem, rd1);
-			end if;
+		if nRst = '0' then
+			for i in 0 to 31 loop
+			mem(i) <= (others => '0'); --setting values of registers all to 0.
+			end loop;
 
-			if a2 = "00000" then
-			rd2 <= (others => '0');
-			else
-			RegisterRead(a2, mem, rd2);
+		else
+			if we3 = '1' then
+			RegisterWrite(wd3, a3, mem);
+		
 			end if;
+		end if;
+
+	end if;
+
+	end process;
+
+	process (a1) is
+	begin
+		if a1 = "00000" then
+			rd1 <= (others => '0');
+
+		else
+			RegisterRead(a1, mem, rd1);
 
 		end if;
-	end if;
+	end process;
 
-	end if;
+	process (a2) is
+	begin
+		if a2 = "00000" then
+			rd2 <= (others => '0');
 
+		else
+			RegisterRead(a2, mem, rd2);
+
+		end if;
 	end process;
 
 end architecture;
