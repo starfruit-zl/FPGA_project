@@ -7,7 +7,7 @@ entity regfile is
 port(
 	--inputs
 	clk : in std_logic; 
-	we3         : in std_logic; --Write enable signal
+	nRst, we3   : in std_logic; --Write enable signal
 	wd3         : in std_logic_vector(31 downto 0); --Data to be written to register. write bus is 31 to 0 size
 	a1, a2, a3  : in std_logic_vector(4 downto 0); --selector value for registers, 4 to 0 size.
 
@@ -76,7 +76,13 @@ begin
 	begin
 
 	if rising_edge(clk) then
-	
+		
+	if nRst = '0' then
+		for i in 0 to 31 loop
+		mem(i) <= x"00000000"; --setting values of registers all to 0.
+		end loop;
+	else
+		
 		if we3 = '1' then
 		
 		RegisterWrite(wd3, a3, mem);
@@ -95,7 +101,8 @@ begin
 			end if;
 
 		end if;
-	
+	end if;
+
 	end if;
 
 	end process;
