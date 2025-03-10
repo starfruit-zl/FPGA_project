@@ -29,6 +29,7 @@ begin
 	variable inputB : signed(31 downto 0);
 	variable shiftNum : integer;
 	variable output : signed(31 downto 0);
+	variable OV : boolean;
 
 	begin
 		inputA := signed(A);
@@ -37,22 +38,22 @@ begin
 		shiftNum := to_integer(unsigned(B));
 		overflow <= '0';
 		negative <= '0';
-		zero <= '0';
-		
+		zero <= '0';		
+
+
 		case ALU_ctrl is
 			when "000" => 
 				output := inputA + inputB;
 				result <= std_logic_vector(inputA + inputB);
-
-				if output(31) /= (inputA(31) and inputB(31)) then --overflow, with override, as in can be triggered earlier, won't overwrite. Most general: inputA and B are one sign, output another.
+				
+				if (((A(31) and B(31) and not output(31))) or (not A(31) and not B(31) and output(31)))= '1' then --overflow, with override, as in can be triggered earlier, won't overwrite. Most general: inputA and B are one sign, output another.
 				overflow <= '1';
 				end if;
-			
 			when "001" =>  --sub
 				output := inputA - inputB;
 				result <= std_logic_vector(inputA - inputB);
 
-				if output(31) /= (inputA(31) and inputB(31)) then --overflow, with override, as in can be triggered earlier, won't overwrite. Most general: inputA and B are one sign, output another.
+				if ((not A(31) and B(31) and not output(31)) or (A(31) and not B(31) and not output(31))) = '1' then --overflow, with override, as in can be triggered earlier, won't overwrite. Most general: inputA and B are one sign, output another.
 				overflow <= '1';
 				end if;
 
@@ -115,8 +116,8 @@ begin
 				output := inputA - inputB;
 
 				if output(31) = '1' then
-				result <= (others => '1');
-				output := (others => '1');				
+				result <= x"00000001";
+				output := x"00000001";			
 
 				else
 				result <= (others => '0');
