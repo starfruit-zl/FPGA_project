@@ -1,0 +1,13 @@
+Process for Writing PC:
+What?: A system to track the location of the next instruction to be fetched from the memory for execution.
+How?: Like a register, store a value that is then sent to the MAR. The value loaded after each instruction corresponds to either the current address plus 4, or a address value input by the immediate extend (called PC-Extend).
+Why?: allows a continuous execution of code, without the PC the point of current execution would get lost.
+
+Problem: Inputs currently do not accept the extend format
+Solution: Brian instructed this: implement in datapath, PC is therefore just a clock sensitive register with reset.
+
+Problem: Reset async or sync?
+Solution: Following convention from registers, the reset is on the rising edge of the clock.
+
+Problem: What does reset mean?
+Solution: output the value 0. (maybe later) set it up such that it stores, and will eventually output the first input value (like start of a program).

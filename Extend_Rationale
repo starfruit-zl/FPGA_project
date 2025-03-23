@@ -1,0 +1,20 @@
+Process Writing for Extend-Unit:
+What?: It extends immediate values to 32-bits.
+How?: It loads an output bus with earlier values, repeating the final bit of the final immediate for an accurately signed value.
+Why?: So that operations on them may be performed and stored into registers.
+
+Problem: Based on the selection bit, how to select a specific operation/configuration?
+
+    Solution: Case-When statement (Multiplexer).
+
+Problem: When the selection bit is out of the 5 standard options (I, S, B, U, J types), what is output?
+
+    Solution: all 'X' signals, as it will allow for error catching, but now makes program more volatile. Otherwise, all '0' would maybe also work, yet harder to catch.
+
+Problem: Extending. General format
+
+    Solution: for 0 to ... loop to set carried immediates, starting to reading input from (start_point + i), otherwise extended bit is duplicated in loop.
+
+Problem: Many mentions arithmetic shift option
+
+    Solution: temporarily ignore, as theoretical CPU being built does not make use of such code.
