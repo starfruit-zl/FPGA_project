@@ -1,0 +1,16 @@
+Process for Writing Control Unit:
+What: a unit to process op-code and non-numeric data of an instruction.
+How: Grabs and interprets specific bits that will corelate to specific outputs of the circuit.
+Why: To control the components of the RISCV cpu from the bit width of an instruction.
+
+Problem: ImmSrc contains only 2 bits for control, however the CPU has 5 types of immediate sources.
+Solution: Acknowledge, as instructed by Brian, that the diagram is only guiding, and if specifications earlier stated require a change, then don't be afraid to implement. Now has 3 control bits.
+
+Problem: ResultSRC gives option to behave if "2", however 2 does not seem to be a rational output, where diagram only shows 1 and 0.
+Solution: See above, switching to 2 bit output.
+
+Problem: Signal definitions repeated many times if done at each point in table.
+Solution: Establish default signal outputs, which are changed if appropriate in Case When statement.
+
+Problem: BEQ, BNEQ but no CMP?
+Solution: Perform a check such that you can determine if zero flag is triggered or not. Therefore, ALU should be sub and trigger flag.
