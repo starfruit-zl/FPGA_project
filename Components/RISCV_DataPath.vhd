@@ -78,7 +78,7 @@ controlunit_riscv: entity work.RISCV_ControlUnit(behave) port map (
 	--signal ImmSrc    : out std_logic_vector(2 downto 0); --specified as 2, but need 3.
 	--signal RegWrite  : out std_logic; --write enable signal
 	--signal ALUControl: out std_logic_vector(2 downto 0));
-alu_riscv: entity work.RISCV_ALU(behave) (
+alu_riscv: entity work.RISCV_ALU(behave) port map(
 	--inputs
 	A => A, 
 	B => B, 
@@ -90,14 +90,14 @@ alu_riscv: entity work.RISCV_ALU(behave) (
 	negative => negative,
 	zero => alu_zero);
 
-extend_riscv: entity work.extend_unit(behave) (
+extend_riscv: entity work.extend_unit(behave) port map(
 	--inputs
 	imm_in => data_output(31 downto 7),
 	extend_ctrl => extend_ctrl,
 	--outputs
 	imm_out => imm_out);
 
-register_riscv: entity work.regfile(behave) (
+register_riscv: entity work.regfile(behave) port map(
 	--inputs
 	clk => clk,
 	clr => reset,
@@ -109,7 +109,7 @@ register_riscv: entity work.regfile(behave) (
 	rd1 => A,--output reg1
 	rd2 => rd2);--output reg2
 
-d_cache_riscv: entity work.dmem(behave) (
+d_cache_riscv: entity work.dmem(behave) port map(
 	clk => clk,
 	we => MemWriteEnable, --write enable
 	a => alu_result,--access address
