@@ -104,7 +104,7 @@ register_riscv: entity work.regfile(behave) port map(
 	we3 => RegWrite,
 	wd3 => result,
 	a1 => data_output(19 downto 15),--read register 1
-	a2 => data_output(24 downto 20),--read register 2
+	a2 => data_output(25 downto 20),--read register 2
 	a3 => data_output(11 downto 7),--write register 1
 	--outputs
 	rd1 => A,--output reg1
