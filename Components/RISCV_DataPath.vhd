@@ -16,25 +16,36 @@ end entity;
 
 architecture behave of top is
 --internal signals:
+	--ALU:
 signal B : std_logic_vector(31 downto 0);
 signal A : std_logic_vector(31 downto 0);
-signal result :  std_logic_vector (31 downto 0);
+signal ALU_result : std_logic_vector (31 downto 0);
+signal alu_zero : std_logic; 
+signal ALU_ctrl : std_logic_vector (2 downto 0);
+
+	--Register File
+signal RegWrite: std_logic;
+signal rd2 : std_logic_vector (31 downto 0);
+signal result : std_logic_vector (31 downto 0);
+
+	--Extend Unit
+signal extend_ctrl : std_logic_vector (2 downto 0);
+signal imm_out : std_logic_vector (31 downto 0);
+
+	--PC
 signal pcnext : std_logic_vector (31 downto 0);
-signal address_input : std_logic_vector (31 downto 0);
-signal data_output : std_logic_vector (31 downto 0);
-signal alu_zero : std_logic;
+signal PC : std_logic_vector (31 downto 0);
+
+	--DMem
+signal d_cache_result : std_logic_vector (31 downto 0);
+
+	--IMem
+signal Instr : std_logic_vector (31 downto 0);
+
+	--Signals for control unit
 signal PCSrc : std_logic;
 signal ResultSrc : std_logic_vector (1 downto 0);
 signal ALUSrc : std_logic;
-signal extend_ctrl : std_logic_vector (2 downto 0);
-signal RegWrite: std_logic;
-signal ALU_ctrl : std_logic_vector (2 downto 0);
-signal ALU_result : std_logic_vector (31 downto 0);
-signal overflow : std_logic;
-signal negative : std_logic; 
-signal imm_out : std_logic_vector (31 downto 0);
-signal rd2 : std_logic_vector (31 downto 0);
-signal d_cache_result : std_logic_vector (31 downto 0);
 signal MemWriteEnable : std_logic;
 
 begin
@@ -45,18 +56,18 @@ pc_riscv: entity work.pc(behave) port map (
 	reset => reset, 
 	pc_in => pcnext, 
 	--outputs
-	pc_out => address_input); --Re-assign direct connections as needed.
+	pc_out => PC); --Re-assign direct connections as needed.
 
 i_cache_riscv: entity work.i_cache(behave) port map (
-	address_input => address_input, 
-	data_output => data_output);
+	address_input => PC, 
+	data_output => Instr);
 
 controlunit_riscv: entity work.RISCV_ControlUnit(behave) port map (
 	--inputs
 	zero => alu_zero,
-	op => data_output(6 downto 0), 
-	funct3 => data_output(14 downto 12), 
-	funct7 => data_output(31 downto 25),
+	op => Instr(6 downto 0), 
+	funct3 => Instr(14 downto 12), 
+	funct7 => Instr(31 downto 25),
 	--outputs
 	PCSrc => PCSrc, --need to implement switch.
 	ResultSrc => ResultSrc, --need to implement switch.
@@ -86,13 +97,13 @@ alu_riscv: entity work.RISCV_ALU(behave) port map(
 	--outputs
 	result => alu_result,
 	--flags
-	overflow => overflow,
-	negative => negative,
+	overflow => open,
+	negative => open,
 	zero => alu_zero);
 
 extend_riscv: entity work.extend_unit(behave) port map(
 	--inputs
-	imm_in => data_output(31 downto 7),
+	imm_in => Instr(31 downto 7),
 	extend_ctrl => extend_ctrl,
 	--outputs
 	imm_out => imm_out);
@@ -103,9 +114,9 @@ register_riscv: entity work.regfile(behave) port map(
 	clr => reset,
 	we3 => RegWrite,
 	wd3 => result,
-	a1 => data_output(19 downto 15),--read register 1
-	a2 => data_output(24 downto 20),--read register 2
-	a3 => data_output(11 downto 7),--write register 1
+	a1 => Instr(19 downto 15),--read register 1
+	a2 => Instr(24 downto 20),--read register 2
+	a3 => Instr(11 downto 7),--write register 1
 	--outputs
 	rd1 => A,--output reg1
 	rd2 => rd2);--output reg2
@@ -124,6 +135,7 @@ d_cache_riscv: entity work.dmem(behave) port map(
 	--Cycle: current PC -> instruction memory -> decode instruction -> call control unit to decide relevant path.
 		WriteData <= rd2;
 		DataAdr <= alu_result;
+		MemWrite <= MemWriteEnable;
 
 
 		case ALUSrc is
@@ -142,16 +154,16 @@ d_cache_riscv: entity work.dmem(behave) port map(
 			when "01" =>
 			result <= d_cache_result;
 			when "10" =>
-			result <= std_logic_vector(to_unsigned(to_integer(unsigned(address_input)) + 4, 32)); 
+			result <= std_logic_vector(to_unsigned(to_integer(unsigned(PC)) + 4, 32)); 
 			when others =>
 			result <= (others => '0');
 		end case;
 
 		case PCSrc is
 			when '0' =>
-			pcnext <= std_logic_vector(to_unsigned(to_integer(unsigned(address_input)) + 4, 32));
+			pcnext <= std_logic_vector(to_unsigned(to_integer(unsigned(PC)) + 4, 32));
 			when '1' =>
-			pcnext <= std_logic_vector(unsigned(address_input) + unsigned(imm_out));
+			pcnext <= std_logic_vector(unsigned(PC) + unsigned(imm_out));
 			when others =>
 			pcnext <= (others => '0');
 		end case;
