@@ -10,18 +10,20 @@ port(
 		--inputs
 	    A      : in std_logic_vector(31 downto 0);
 	    B      : in std_logic_vector(31 downto 0);
-            ALU_ctrl  : in std_logic_vector(2 downto 0);
+            ALU_ctrl  : in std_logic_vector(3 downto 0);
 		--outputs
             result    : out std_logic_vector(31 downto 0);
 	--flags
             overflow  : out std_logic;
             negative  : out std_logic;
-            zero      : out std_logic);
+            zero      : out std_logic;
+	    carry     : out std_logic);
 
 end entity;
 
 architecture behave of RISCV_ALU is
-
+	signal temp_result : std_logic(32 downto 0);
+	signal V : std_logic;
 begin
 
 	process (ALU_ctrl, A, B) is
@@ -29,49 +31,37 @@ begin
 	variable inputB : signed(31 downto 0);
 	variable shiftNum : integer;
 	variable output : signed(31 downto 0);
-	variable OV : boolean;
 
 	begin
 		inputA := signed(A);
 		inputB := signed(B);	
 		output := (others => '0');
 		shiftNum := to_integer(unsigned(B));
+		carry <= '0';
 		overflow <= '0';
 		negative <= '0';
 		zero <= '0';		
 
 
 		case ALU_ctrl is
-			when "000" => 
-				output := inputA + inputB;
-				result <= std_logic_vector(inputA + inputB);
-				
-				if (((A(31) and B(31) and not output(31))) or (not A(31) and not B(31) and output(31)))= '1' then --overflow, with override, as in can be triggered earlier, won't overwrite. Most general: inputA and B are one sign, output another.
-				overflow <= '1';
-				end if;
-			when "001" =>  --sub
-				output := inputA - inputB;
-				result <= std_logic_vector(inputA - inputB);
+			when "0000" => --add
+				temp_result <= std_logic_vector(inputA + inputB);
 
-				if ((not A(31) and B(31) and not output(31)) or (A(31) and not B(31) and not output(31))) = '1' then --overflow, with override, as in can be triggered earlier, won't overwrite. Most general: inputA and B are one sign, output another.
-				overflow <= '1';
-				end if;
+			when "0001" | "0111" | "1000" =>  --sub, slt, sltu. Improvement, re-use the sub hardware.
+				temp_result <= std_logic_vector(inputA - inputB);
 
-			when "010" =>  --and (if it turns out that flags are logical, stop setting output will disallow check).
-				output := inputA and inputB;
-				result <= A and B;
+			when "0010" =>  --and (if it turns out that flags are logical, stop setting output will disallow check).
+				temp_result <= A and B;
 
-			when "011" =>  --or
-				output := inputA or inputB;
-				result <= A or B;
+			when "0011" =>  --or
+				temp_result <= A or B;
 
-			when "100" =>  --xor
-				output := inputA xor inputB;
-				result <= A xor B;
+			when "0100" =>  --xor
+				temp_result <= A xor B;
 
-			when "101" =>  --sll --add #B 0's to left of A (I am aware of built-in function, was just curious).
+			when "0101" =>  --sll --add #B 0's to left of A (I am aware of built-in function, was just curious).
 				if shiftNum = 0 then
-				result <= A;
+				temp_result <= A;
 
 				else
 				for i in 31 downto shiftNum loop
@@ -82,18 +72,13 @@ begin
 				inputA(i) := '0';
 				end loop;
 			
-				result <= std_logic_vector(inputA);
-				end if;
-				output := inputA;
-				
-				if output(31) /= A(31) then --assumed overflow: change of sign from shift.
-				overflow <= '1';
+				temp_result <= std_logic_vector(inputA);
 				end if;
 
-			when "110" => --srl --add 0 to right
+			when "0110" => --srl --add 0 to right
 
 				if shiftNum = 0 then
-				result <= A;
+				temp_result <= A;
 
 				else
 				for i in 0 to 31-shiftNum loop --opposite direction as to not attempt to grab undefined values.
@@ -104,41 +89,40 @@ begin
 				inputA(i) := '0';
 				end loop;
 
-				result <= std_logic_vector(inputA);
-				end if;
-				output := inputA;
-
-				if output(31) /= A(31) then --assumed overflow: change of sign from shift.
-				overflow <= '1';
+				temp_result <= std_logic_vector(inputA);
 				end if;
 
-			when "111" =>  --slt
-				output := inputA - inputB;
+			when "1001" =>  --sra:
 
-				if output(31) = '1' then
-				result <= x"00000001";
-				output := x"00000001";			
-
-				else
-				result <= (others => '0');
-				output := (others => '0');	
-				
-				end if;
-				
 
 			when others =>
-				result <= (others => '0');
+				temp_result <= (others => '0');
 		end case;
-		--updating flags
-
-		if output(31) = '1' then --negative
-		negative <= '1';
-		end if;
-
-		if output = "0" then
-		zero <= '1';
-		end if;
 	end process;
 
+	process (A, B, Temp_Result, ALU_ctrl)
+	begin
+		if (ALU_ctrl = "0000") then
+		V <= (A(31) and B(31) and not(temp_result(31))) or (not(A(31)) and not(B(31)) and temp_result(31));
+		
+		else
+		
+		V <= (A(31) and not(B(31)) and not(temp_result(31))) or (not(A(31)) and B(31) and temp_result(31));
+		
+		end if;
+	end process;
+	
+	with ALU_ctrl select
+	result <= (x"0000000" & "000" & (temp_result(31) xor V)) when "0111",
+			  else (x"0000000" & "000" & not temp_result(32)) when "1001",
+			  else temp_result(31 downto 0);
+	
+	overflow <= V when alu_ctrl = "0000" or alu_ctrl = "0001" else '0';
+	
+	zero <= '1' when to_integer(signed(temp_result(31 downto 0))) = 0 else '0';
+	
+	negative <= temp_result(31) when alu_ctrl = "0000" or ALU_ctrl = "0001" else '0';
+	
+	carry <= temp_result(32) when ALU_ctrl = "0000" or ALU_ctrl = "0001" else '0';
 
 end architecture;
