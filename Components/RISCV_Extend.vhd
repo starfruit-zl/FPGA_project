@@ -75,7 +75,7 @@ begin
 			immWork(0) := '0';
 
 			for i in 1 to 10 loop
-			immWork(i) := imm_in(31-i);
+			immWork(i) := imm_in(20+i);
 			end loop;
 	
 			immWork(11) := imm_in(20);

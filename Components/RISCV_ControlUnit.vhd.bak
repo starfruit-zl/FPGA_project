@@ -84,7 +84,6 @@ begin
 
 		when "0000011" => --only LW(Load Word), funct3=010. 
 			ResultSrc1 <= "01";
-			RegWrite1 <= '1';
 			ALUSrc1 <= '1';
 			ImmSrc1 <= "000"; --I-Type
 
