@@ -10,6 +10,7 @@ port(
 	--outputs
 	signal WriteData : out std_logic_vector(31 downto 0);
 	signal DataAdr	 : out std_logic_vector(31 downto 0);
+	signal PCOut 	 : out std_logic_vector(31 downto 0);
 	signal MemWrite	 : out std_logic);
 
 end entity;
@@ -23,15 +24,18 @@ signal pcnext : std_logic_vector (31 downto 0);
 signal address_input : std_logic_vector (31 downto 0);
 signal data_output : std_logic_vector (31 downto 0);
 signal alu_zero : std_logic;
-signal PCSrc : std_logic;
-signal ResultSrc : std_logic_vector (1 downto 0);
+signal alu_negative : std_logic;
+signal alu_overflow : std_logic;
+signal alu_carry : std_logic;
+signal PCSrc : std_logic_vector (1 downto 0);
+signal ResultSrc : std_logic_vector (2 downto 0);
 signal ALUSrc : std_logic;
 signal extend_ctrl : std_logic_vector (2 downto 0);
 signal RegWrite: std_logic;
-signal ALU_ctrl : std_logic_vector (2 downto 0);
+signal ALU_ctrl : std_logic_vector (3 downto 0);
 signal ALU_result : std_logic_vector (31 downto 0);
-signal overflow : std_logic;
-signal negative : std_logic; 
+signal DataSize : std_logic_vector (1 downto 0);
+signal DataType : std_logic;
 signal imm_out : std_logic_vector (31 downto 0);
 signal rd2 : std_logic_vector (31 downto 0);
 signal d_cache_result : std_logic_vector (31 downto 0);
@@ -54,6 +58,9 @@ i_cache_riscv: entity work.i_cache(behave) port map (
 controlunit_riscv: entity work.RISCV_ControlUnit(behave) port map (
 	--inputs
 	zero => alu_zero,
+	negative => alu_negative,
+	overflow => alu_overflow,
+	carry => alu_carry,
 	op => data_output(6 downto 0), 
 	funct3 => data_output(14 downto 12), 
 	funct7 => data_output(31 downto 25),
@@ -64,20 +71,10 @@ controlunit_riscv: entity work.RISCV_ControlUnit(behave) port map (
 	ALUSrc => ALUSrc, --need to implement switch.
 	ImmSrc => extend_ctrl,
 	RegWrite => RegWrite, 
-	ALUControl => ALU_ctrl);
---inputs
---	signal zero   : in std_logic; --Wired to the zero signal of the ALU, Flag activates triggering output.
-	--signal op     : in std_logic_vector(6 downto 0);
-	--signal funct3 : in std_logic_vector(2 downto 0);
-	--signal funct7 : in std_logic_vector(6 downto 0);
-		--outputs
-	--signal PCSrc     : out std_logic; -- whether PC is using PC+4 (0) or PC+offset (1).
-	--signal ResultSrc : out std_logic_vector(1 downto 0); --0 means ALU as src, 1 means Mem, "10"(2) means PC+4 is written into the regfile for JAL and JALR instruction
-	--signal MemWrite  : out std_logic; -- interfaces with register, write enable signal/
-	--signal ALUSrc    : out std_logic; --immediate or register value
-	--signal ImmSrc    : out std_logic_vector(2 downto 0); --specified as 2, but need 3.
-	--signal RegWrite  : out std_logic; --write enable signal
-	--signal ALUControl: out std_logic_vector(2 downto 0));
+	ALUControl => ALU_ctrl,
+	DataSize => DataSize,
+	DataType => DataType);
+
 alu_riscv: entity work.RISCV_ALU(behave) port map(
 	--inputs
 	A => A, 
@@ -86,8 +83,9 @@ alu_riscv: entity work.RISCV_ALU(behave) port map(
 	--outputs
 	result => alu_result,
 	--flags
-	overflow => overflow,
-	negative => negative,
+	carry => alu_carry,
+	overflow => alu_overflow,
+	negative => alu_negative,
 	zero => alu_zero);
 
 extend_riscv: entity work.extend_unit(behave) port map(
@@ -112,8 +110,11 @@ register_riscv: entity work.regfile(behave) port map(
 
 d_cache_riscv: entity work.dmem(behave) port map(
 	clk => clk,
+	reset => reset,
 	we => MemWriteEnable, --write enable
 	a => alu_result,--access address
+	dataType => DataType,
+	dataSize => DataSize,
 	wd => rd2,--write data
 	--outputs
 	rd => d_cache_result); --read data
@@ -122,18 +123,22 @@ d_cache_riscv: entity work.dmem(behave) port map(
 		 imm_out when ALUSrc = '1' else (others => '0');
 	
 	with ResultSrc select
-	result <= alu_result when "00",
-		  d_cache_result when "01",
-		  std_logic_vector(to_unsigned(to_integer(unsigned(address_input))+4, 32)) when "10",
+	result <= alu_result when "000",
+		  d_cache_result when "001",
+		  std_logic_vector(to_unsigned(to_integer(unsigned(address_input))+4, 32)) when "010",
+		  imm_out when "011",
+		  std_logic_vector(unsigned(address_input) + unsigned(imm_out)) when "100",
 		  (others => '0') when others;
 	
 	with PCSrc select
-	pcnext <= std_logic_vector(to_unsigned(to_integer(unsigned(address_input))+4,32)) when '0',
-				std_logic_vector(unsigned(address_input) + unsigned(imm_out)) when '1',
+	pcnext <= std_logic_vector(to_unsigned(to_integer(unsigned(address_input))+4,32)) when "00",
+				std_logic_vector(unsigned(address_input) + unsigned(imm_out)) when "01",
+				ALU_result when "10",
 				std_logic_vector(to_unsigned(to_integer(unsigned(address_input))+4,32)) when others;
 	
 		WriteData <= rd2;
 		DataAdr <= alu_result;
 		MemWrite <= MemWriteEnable;
+		PCOut <= address_input;
 
 end architecture;
