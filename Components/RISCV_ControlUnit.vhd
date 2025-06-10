@@ -9,151 +9,218 @@ entity RISCV_ControlUnit is
 port(
 		--inputs
 	 Signal zero   : in std_logic; --Wired to the zero  of the ALU, Flag activates triggering output.
+	 signal negative : in std_logic;
+	 signal carry  : in std_logic;
+	 signal overflow : in std_logic; --rest of flags added.
 	 signal op     : in std_logic_vector(6 downto 0);
 	 signal funct3 : in std_logic_vector(2 downto 0);
 	 signal funct7 : in std_logic_vector(6 downto 0);
 		--outputs
-	 signal PCSrc    : out std_logic; -- whether PC is using PC+4 (0) or PC+offset (1).
-	 signal ResultSrc: out std_logic_vector(1 downto 0); --0 means ALU as src, 1 means Mem, "10"(2) means PC+4 is written into the regfile for JAL and JALR instruction
+	 signal PCSrc    : out std_logic_vector(1 downto 0); -- whether PC is using PC+4 (0) or PC+offset (1).
+	 signal ResultSrc: out std_logic_vector(2 downto 0); --0 means ALU as src, 1 means Mem, "10"(2) means PC+4 is written into the regfile for JAL and JALR instruction
 	 signal MemWrite : out std_logic; -- interfaces with register, write enable /
 	 signal ALUSrc   : out std_logic;  --immediate or register value
 	 signal ImmSrc   : out std_logic_vector(2 downto 0); --specified as 2, but need 3.
 	 signal RegWrite : out std_logic; --write enable 
-	 signal ALUControl : out std_logic_vector(2 downto 0));
+	 signal ALUControl : out std_logic_vector(3 downto 0);
+	 signal DataType : out std_logic;
+	 signal DataSize : out std_logic_vector(1 downto 0));
 
 end entity;
 
 architecture behave of RISCV_ControlUnit is
 
 	signal  MemWrite1, RegWrite1 : std_logic; --for enables
-	signal ALUSrc1, PCSrc1 : std_logic; --for 1-bit muxes in DataPath
-	signal ResultSrc1 : std_logic_vector(1 downto 0); --for 2-bit muxes in DataPath
-	signal ALUControl1, ImmSrc1 : std_logic_vector(2 downto 0); --for controling ALU, Extend
+	signal ALUSrc1, DataType1 : std_logic; --for 1-bit muxes in DataPath
+	signal PCSrc1, DataSize1 : std_logic_vector(1 downto 0); --for 2-bit muxes in DataPath
+	signal ResultSrc1, ImmSrc1 : std_logic_vector(2 downto 0); --for controling ALU, Extend
+	signal ALUControl1 : std_logic_vector(3 downto 0);
 	
 begin
 	process(zero, op, funct3, funct7) is
 	begin
 	--defaults
-	PCSrc1      <= '0'; -- PC+4
-	ResultSrc1  <= "00"; --directly output ALU (as opposed to data from mem)
+	PCSrc1      <= "00"; -- PC+4
+	ResultSrc1  <= "000"; --directly output ALU (as opposed to data from mem)
 	MemWrite1   <= '0'; --Don't ALU (or mem Data) write to memory
 	ALUSrc1     <= '0'; -- whether loading register 2 (default) or an immediate (if using funct7?)
 	ImmSrc1     <= "XXX"; -- Which immediate type, default as don't care.
 	RegWrite1   <= '0'; -- Don't write to Reg (1 enables).
-    ALUControl1 <= "000"; -- Select ADD in ALU .
+    ALUControl1 <= "0000"; -- Select ADD in ALU .
+	DataType1 <= 'X';
+	DataSize1 <= "XX";
 
 
 	case op is 
 		when "0110011" => --mostly R/I-shift type.
+		RegWrite1 <= '1'; --always regWrite
 		case funct3 is
 			when "000" => --add or sub
 				if funct7(5) = '1' then --sub
-				RegWrite1 <= '1';
-				ALUControl1 <= "001";
-				else  -- add
-				RegWrite1 <= '1';
-				end if;
+				ALUControl1 <= "0001";
+				end if; --else add
 		
 			when "111" => --and
-				RegWrite1 <= '1';
-				ALUControl1 <= "010";
+				ALUControl1 <= "0010";
 
 			when "110" => --or
-				RegWrite1 <= '1';
-				ALUControl1 <= "011";
+				ALUControl1 <= "0011";
 
 			when "100" => --xor
-				RegWrite1 <= '1';
-				ALUControl1 <= "100";
+				ALUControl1 <= "0100";
 
 			when "001" => --SLL
-				RegWrite1 <= '1';
-				ALUControl1 <= "101";
+				ALUControl1 <= "0101";
 
-			when "101" => --SRL
-				RegWrite1 <= '1';
-				ALUControl1 <= "110";
+			when "101" =>
+				if funct7(5) = '1' then --SRA
+				ALUControl1 <= "1000";
+				else --SRL
+				ALUControl1 <= "0110";
+				end if;
 
 			when "010" => --SLT
-				RegWrite1 <= '1';
-				ALUControl1 <= "111";
+				ALUControl1 <= "0111";
 
 			when others =>
 
 		end case;
+		
+		when "0010111" => --AUIPC
+			ResultSrc1 <= "100";
+			ImmSrc1 <= "011"; --U-Type
+			RegWrite1 <= '1';
 
-		when "0000011" => --only LW(Load Word), funct3=010. 
-			ResultSrc1 <= "01";
+		when "0000011" => --Common operations
+			ResultSrc1 <= "001";
 			RegWrite1 <= '1';
 			ALUSrc1 <= '1';
 			ImmSrc1 <= "000"; --I-Type
+		case funct3 is 
+			when "010" => --LW(Load Word), funct3=010. 
+			DataSize1 <= "00";
+			
+			when "001" => --LH(Load Halfword)
+			DataSize1 <= "01";
+			DataType1 <= '0';
 
-		when "0100011" => --only SW(Store Word), funct3=010.
+			when "101" => --LHU(Load unsigned Halfword)
+			DataSize1 <= "01";
+			DataType1 <= '1';
+	
+			when "000" => --LB (Load Byte)
+			DataSize1 <= "10";
+			DataType1 <= '0';	
+
+			when "100" => --LBU (Load Unsigned Byte)
+			DataSize1 <= "10";
+			DataType1 <= '1';
+			
+			when others =>	
+		end case;
+
+		when "0100011" => --common case
 			MemWrite1 <= '1';
 			ALUSrc1 <= '1';
 			ImmSrc1 <= "001"; --S-Type
+		case funct3 is
+			when "010"=> --SW(Store Word), funct3=010.
+			DataSize1 <= "00";
+
+			when "001"=> --SH (Store Halfword)
+			DataSize1 <= "01";
+
+			when "000"=> --SB(Store Byte)
+			DataSize1 <= "10";
+		
+			when others =>
+		end case;
 		
 		when "1100011" => --RegWrite1 stays off, MemWrite1 stays off
 			ImmSrc1 <= "010"; --B-Type.
-			ALUControl1 <= "001";
-			if funct3(0) = '1' then -- Branch if not Equal (BNQ)
+			ALUControl1 <= "0001";
+		case funct3 is
+			when "001" => -- Branch if not Equal (BNE)
 				if zero = '0' then --if r1-r2 != 0, then branch.
-				PCSrc1 <= '1';
+				PCSrc1 <= "01";
 				--else: default, PC + 4.
 				end if;
-			else -- Branch if Equal (BEQ)
+			when "000" => --Branch if Equal (BEQ)
 				if zero = '1' then -- r1-r2 = 0 then branch.
-				PCSrc1 <= '1';
+				PCSrc1 <= "01";
 				--else: default, PC + 4.	
 				end if;
-			end if;
+			when "100" => --Branch if Less Than (BLT)
+				if (negative xor overflow)= '1' then
+				PCSrc1 <= "01";
+				--else default
+				end if;
+			when "110" => --Branch if Less Than Unsigned (BLTU)
+				if carry = '0' then
+				PCSrc1 <= "01";
+				--else default
+				end if;
+			when "101" => --Branch if Greater Than(BGE)
+				if (negative xor overflow) = '0' then
+				PCSrc1 <= "01";
+				--else default
+				end if;
+			when "111" => --Branch if Greater Than Unsigned (BGEU)
+				if (carry and not(overflow)) = '1' then
+				PCSrc1 <= "01";
+				--else default
+				end if;
+			when others =>
+		end case;
 		
 		when "1101111" => --only JAL
-			PCSrc1 <= '1';
-			ResultSrc1 <= "10"; --output PC+4 as result.
+			PCSrc1 <= "01";
+			ResultSrc1 <= "010"; --output PC+4 as result.
 			ImmSrc1 <= "100"; -- J-type
 			RegWrite1 <= '1';
 			--Loading PC+4 to reg? Maybe not drawn in processor diagram.
 
 		when "1100111" => -- JALR, funct3 = 000
-			PCSrc1 <= '1';
+			PCSrc1 <= "10"; --grad pc from alu.
 			ALUSrc1 <= '1';
-			ResultSrc1 <= "10"; --output PC+4 as result.
+			ResultSrc1 <= "010"; --output PC+4 as result.
 			ImmSrc1 <= "000"; --I-Type
 			RegWrite1 <= '1';
 			--Loading PCNext <= PC+Imm+rd?		
 
-		when "0010011" =>
+		when "0010011" => --Common case
+				ImmSrc1 <= "000"; --I-Type
+				ALUSrc1 <= '1';
+				RegWrite1 <= '1';
 		case funct3 is
 			when "000" => --ADDI
-				ImmSrc1 <= "000"; --I-Type
-				--Add is default.
-				ALUSrc1 <= '1';
-				RegWrite1 <= '1';
 
 			when "111" => --ANDI
-				RegWrite1 <= '1';
-				ALUControl1 <= "010";
-				ImmSrc1 <= "000"; --I-Type
-				ALUSrc1 <= '1';
+				ALUControl1 <= "0010";
+
+			when "110" => --ORI
+				ALUControl1 <= "0011";
+
+			when "100" => --XORI
+				ALUControl1 <= "0100";
 
 			when "001" => --SLLI
-				RegWrite1 <= '1';
-				ALUControl1 <= "101";
-				ImmSrc1 <= "000"; --I-Type
-				ALUSrc1 <= '1';
+				ALUControl1 <= "0101";
 
-			when "101" => --SRLI
-				RegWrite1 <= '1';
-				ALUControl1 <= "110";
-				ImmSrc1 <= "000"; --I-Type
-				ALUSrc1 <= '1';
+			when "101" => --SRLI, --SRAI
+				if funct7(5) = '1' then --SRAI
+				ALUControl1 <= "1001"; --SRA instruction.
+				ImmSrc1 <= "101";
+
+				else --SRLI
+				ALUControl1 <= "0110";
+				end if;
 
 			when "010" => --SLTI
-				RegWrite1 <= '1';
-				ALUControl1 <= "111";
-				ImmSrc1 <= "000"; --I-Type
-				ALUSrc1 <= '1';
+				ALUControl1 <= "0111";
+
+			when "011" => --SLTUI
+				ALUControl1 <= "1000";
 			
 			when others =>
 
@@ -163,6 +230,7 @@ begin
 			ImmSrc1 <= "011";
 			ALUSrc1 <= '1';
 			RegWrite1 <= '1';
+			ResultSrc1 <= "011"; --load immediate directly to result.
 
 		when others =>
 			
@@ -178,6 +246,8 @@ begin
 	 ImmSrc    <= ImmSrc1; --specified as 2, but need 3.
 	 RegWrite  <= RegWrite1;--write enable 
 	 ALUControl <= ALUControl1; 
+	 DataType <= DataType1;
+	 DataSize <= DataSize1;
 
 
 end architecture;

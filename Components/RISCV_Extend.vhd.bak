@@ -29,6 +29,15 @@ begin
 			immWork(i) := imm_in(31);
 			end loop;
 
+		when "101" => --I-Type SRA (following Adam's rationale, adapting to not affect funct7).
+			for i in 0 to 4 loop
+			immWork(i) := imm_in(20 + i);
+			end loop;
+	
+			for i in 5 to 31 loop
+			immWork(i) := imm_in(31);
+			end loop;
+
 		when "001" => --S-Type
 			for i in 0 to 4 loop
 			immWork(i) := imm_in(7+i);
@@ -75,7 +84,7 @@ begin
 			immWork(0) := '0';
 
 			for i in 1 to 10 loop
-			immWork(i) := imm_in(31-i);
+			immWork(i) := imm_in(20+i);
 			end loop;
 	
 			immWork(11) := imm_in(20);

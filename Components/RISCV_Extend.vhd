@@ -9,6 +9,7 @@ port(
 		--inputs
 	    imm_in      : in std_logic_vector(31 downto 7);
             extend_ctrl : in std_logic_vector(2 downto 0);
+		--outputs
             imm_out     : out std_logic_vector(31 downto 0));
 end entity;
 
@@ -26,6 +27,15 @@ begin
 			end loop;
 
 			for i in 12 to 31 loop
+			immWork(i) := imm_in(31);
+			end loop;
+
+		when "101" => --I-Type SRAI (following Adam's rationale, adapting to not affect funct7).
+			for i in 0 to 4 loop
+			immWork(i) := imm_in(20 + i);
+			end loop;
+	
+			for i in 5 to 31 loop
 			immWork(i) := imm_in(31);
 			end loop;
 

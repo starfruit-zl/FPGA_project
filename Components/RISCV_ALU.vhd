@@ -69,7 +69,7 @@ begin
 
 			when "0110" => --srl --add 0 to right
 
-				if shiftNum /= 0 then
+				if shiftNum /= 0 and shiftNum < 32 then
 				for i in 0 to 31-shiftNum loop --opposite direction as to not attempt to grab undefined values.
 				inputA(i) := inputA(i+shiftNum);
 				end loop;
@@ -78,12 +78,17 @@ begin
 				inputA(i) := '0';
 				end loop;
 
+				elsif shiftNum >= 32 then
+				for i in 0 to 31 loop
+				inputA(i) := '0';
+				end loop;
+
 				end if;
 
 				temp_result <= std_logic_vector(inputA);
 
 			when "1001" =>  --sra:
-				if shiftNum /= 0 then
+				if shiftNum /= 0 and shiftNum < 32 then
 
 				for i in 0 to 31-shiftNum loop --opposite direction as to not attempt to grab undefined values.
 				inputA(i) := inputA(i+shiftNum);
@@ -92,7 +97,13 @@ begin
 				for i in 32-shiftNum to 31 loop
 				inputA(i) := inputA(31-shiftNum);
 				end loop;
-
+				
+				elsif shiftNum >= 32 then
+				
+				for i in 0 to 31 loop
+				inputA(i) := inputA(31);
+				end loop;				
+				
 				end if;
 
 				temp_result <= std_logic_vector(inputA);

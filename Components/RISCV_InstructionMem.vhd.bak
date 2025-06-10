@@ -11,7 +11,7 @@ end i_cache;
 
 architecture behave of i_cache is
 begin
-    process (address_input) is
+    process (address_input)
     begin
         case address_input is
 		
